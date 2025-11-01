@@ -33,9 +33,10 @@ The app also includes a **wishlist** feature, stored at the edge using **Cloudfl
 ---
 
 ## Current Status
-- [x] Project scaffolded with Wrangler  
-- [x] `/suggest` endpoint (Llama 3)  
-- [ ] KV wishlist integration  
+- [x] Project scaffolded with Wrangler
+- [x] `/suggest` endpoint (Llama 3)
+- [ ] Use Durable Object to create 'Wishlist' feature
+- [ ] KV Wishlist integration  
 - [ ] Frontend MVP  
 - [ ] Deployment to Pages
 
