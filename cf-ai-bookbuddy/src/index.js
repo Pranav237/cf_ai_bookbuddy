@@ -2,7 +2,7 @@ import { Ai } from "@cloudflare/ai";
 
 export class MyDurableObject {
   async fetch(request) {
-    return new Response("Durable Object active!");
+    return new Response("Durable Object active");
   }
 }
 
