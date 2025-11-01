@@ -1,8 +1,45 @@
 import { Ai } from "@cloudflare/ai";
 
 export class MyDurableObject {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
   async fetch(request) {
-    return new Response("Durable Object active");
+    const url = new URL(request.url);
+
+    const wishlist = (await this.state.storage.get("wishlist")) || [];
+
+    if (url.pathname.endsWith("/add") && request.method === "POST") {
+      const body = await request.json();
+      if (!body.title) return new Response("Missing title", { status: 400 });
+
+      wishlist.push(body.title);
+      await this.state.storage.put("wishlist", wishlist);
+
+      return new Response(JSON.stringify({ ok: true, wishlist }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (url.pathname.endsWith("/remove") && request.method === "POST") {
+      const body = await request.json();
+      const updated = wishlist.filter((b) => b !== body.title);
+      await this.state.storage.put("wishlist", updated);
+
+      return new Response(JSON.stringify({ ok: true, wishlist: updated }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (url.pathname.endsWith("/wishlist") && request.method === "GET") {
+      return new Response(JSON.stringify({ wishlist }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response("Not Found", { status: 404 });
   }
 }
 
@@ -16,8 +53,7 @@ export default {
         const ai = new Ai(env.AI);
         const result = await ai.run("@cf/meta/llama-3-8b-instruct", {
           prompt: `Suggest 3 books based on this description: "${prompt}". 
-                   Return only valid JSON — a list of objects like:
-                   [{"title": "...", "reason": "..."}]`
+                   Return only valid JSON — [{"title": "...", "reason": "..."}]`
         });
 
         let text = result?.response || result;
@@ -32,6 +68,12 @@ export default {
           headers: { "Content-Type": "application/json" },
         });
       }
+    }
+
+    if (url.pathname.startsWith("/wishlist")) {
+      const id = env.MY_DURABLE_OBJECT.idFromName("global-wishlist");
+      const stub = env.MY_DURABLE_OBJECT.get(id);
+      return stub.fetch(request);
     }
 
     return new Response("BookBuddy worker active!", { status: 200 });
