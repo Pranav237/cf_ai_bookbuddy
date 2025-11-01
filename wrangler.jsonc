@@ -4,11 +4,16 @@
   "main": "cf-ai-bookbuddy/src/index.js",
   "compatibility_date": "2025-10-31",
   "ai": { "binding": "AI" },
+  
   "durable_objects": {
     "bindings": [
       { "class_name": "MyDurableObject", "name": "MY_DURABLE_OBJECT" }
     ]
   },
+  "kv_namespaces": [
+    { "binding": "BOOKBUDDY_KV", "id": "65f6ad6d65884085a1c76055ff586217" }
+  ],
   "migrations": [{ "new_sqlite_classes": ["MyDurableObject"], "tag": "v1" }],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  
 }
