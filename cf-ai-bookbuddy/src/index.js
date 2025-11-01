@@ -76,6 +76,22 @@ export default {
       return stub.fetch(request);
     }
 
+    if (url.pathname === "/kv" && request.method === "POST") {
+      const { key, value } = await request.json();
+      await env.BOOKBUDDY_KV.put(key, value);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (url.pathname === "/kv" && request.method === "GET") {
+      const key = url.searchParams.get("key");
+      const value = await env.BOOKBUDDY_KV.get(key);
+      return new Response(JSON.stringify({ key, value }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     return new Response("BookBuddy worker active!", { status: 200 });
   },
 };
