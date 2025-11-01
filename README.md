@@ -1,7 +1,6 @@
 # cf_ai_bookbuddy
 > WIP!!!!!!  
-> Development: Oct 31 – Nov 7  
-> Submitted early for Cloudflare AI Internship consideration.  
+> Development: Oct 31 – Nov 3   
 > Active updates and commits will continue every day.
 
 ---
@@ -25,22 +24,22 @@ The app also includes a **wishlist** feature, stored at the edge using **Cloudfl
 ## Development Timeline
 | Date | Goal |
 |------|------|
-| **Nov 1–2** | Set up Worker project, add Llama 3 prompt endpoint (`/suggest`) |
-| **Nov 3–4** | Implement KV wishlist storage + `/wishlist` route |
-| **Nov 5–6** | Build and connect frontend (Cloudflare Pages ↔ Worker APIs) |
-| **Nov 7** | Final testing, polish, and deployment |
+| **Nov 1** | Set up Worker project, add Llama 3 prompt endpoint (`/suggest`) |
+| **Nov 1–2** | Implement KV wishlist storage + `/wishlist` route |
+| **Nov 2–3** | Build and connect frontend (Cloudflare Pages ↔ Worker APIs) |
+| **Nov 3-4** | Final testing, polish, and deployment |
 
 ---
 
 ## Current Status
 - [x] Project scaffolded with Wrangler
 - [x] `/suggest` endpoint (Llama 3)
-- [ ] Use Durable Object to create 'Wishlist' feature
+- [x] Use Durable Object to create 'Wishlist' feature
 - [ ] KV Wishlist integration  
 - [ ] Frontend MVP  
 - [ ] Deployment to Pages
 
 ---
 
-This repository will remain **actively updated** through Nov 7.  
-Follow commits for progress.
+This repository will remain **actively updated** through Nov 4.  
+Follow commits for awesome progress because progress is the **goal**.
