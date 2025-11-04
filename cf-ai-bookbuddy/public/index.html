@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookBuddy</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #fafafa;
+      margin: 0;
+      padding: 2rem;
+      max-width: 600px;
+      margin-inline: auto;
+      color: #222;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    input {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: #0078d7;
+      color: white;
+      transition: background-color 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem;
+      margin-bottom: 0.4rem;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    li span {
+      flex: 1;
+    }
+
+    .remove {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 0.3rem 0.7rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .remove:hover {
+      background-color: #c0392b;
+    }
+
+    h2 {
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .suggestion-card {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .suggestion-card b {
+      color: #0078d7;
+    }
+
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>BookBuddy</h1>
+
+  <h2>Wishlist</h2>
+  <div class="input-row">
+    <input id="title" placeholder="Book title" />
+    <input id="note" placeholder="Add a note..." />
+    <button id="add">Add</button>
+  </div>
+
+  <ul id="wishlist"></ul>
+
+  <h2>AI Book Suggestions</h2>
+  <div class="input-row">
+    <input id="prompt" placeholder="Describe what kind of book you want..." />
+    <button id="suggest">Get Suggestions</button>
+  </div>
+
+  <ul id="suggestions"></ul>
+
+  <script>
+    const base = location.origin;
+    const ul = document.getElementById("wishlist");
+    const addBtn = document.getElementById("add");
+
+    async function refresh() {
+      try {
+        const res = await fetch(`${base}/wishlist?${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        ul.innerHTML = "";
+
+        if (!data.wishlist || data.wishlist.length === 0) {
+          const li = document.createElement("li");
+          li.textContent = "No books yet — add one!";
+          ul.appendChild(li);
+          return;
+        }
+
+        data.wishlist.forEach(({ title, note }) => {
+          const li = document.createElement("li");
+          const span = document.createElement("span");
+          span.textContent = `${title}${note ? " — " + note : ""}`;
+
+          const del = document.createElement("button");
+          del.className = "remove";
+          del.textContent = "x";
+          del.onclick = async () => {
+            del.disabled = true;
+            await fetch(`${base}/wishlist/remove`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title }),
+            });
+            await refresh();
+          };
+
+          li.appendChild(span);
+          li.appendChild(del);
+          ul.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Failed to load wishlist:", err);
+        ul.innerHTML = `<li class="error">Error loading wishlist.</li>`;
+      }
+    }
+
+    addBtn.onclick = async () => {
+      const title = document.getElementById("title").value.trim();
+      const note = document.getElementById("note").value.trim();
+      if (!title) return alert("Please enter a title");
+
+      addBtn.disabled = true;
+      try {
+        const res = await fetch(`${base}/wishlist/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, note }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        document.getElementById("title").value = "";
+        document.getElementById("note").value = "";
+        await refresh();
+      } catch (err) {
+        alert("Add failed: " + err.message);
+      } finally {
+        addBtn.disabled = false;
+      }
+    };
+
+    const suggestBtn = document.getElementById("suggest");
+    const suggestionsUl = document.getElementById("suggestions");
+
+    suggestBtn.onclick = async () => {
+      const prompt = document.getElementById("prompt").value.trim();
+      if (!prompt) return alert("Enter a description first!");
+      suggestBtn.disabled = true;
+      suggestionsUl.innerHTML = "<li>Thinking...</li>";
+
+      try {
+        const res = await fetch(`${base}/suggest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        suggestionsUl.innerHTML = "";
+        if (!data.suggestions || data.suggestions.length === 0) {
+          suggestionsUl.innerHTML = "<li>No suggestions found.</li>";
+          return;
+        }
+
+        data.suggestions.forEach(({ title, reason }) => {
+          const li = document.createElement("li");
+          li.classList.add("suggestion-card");
+          li.innerHTML = `<span><b>${title}</b> — ${reason}</span>`;
+          suggestionsUl.appendChild(li);
+        });
+      } catch (err) {
+        console.error(err);
+        suggestionsUl.innerHTML = `<li class="error">Error fetching suggestions.</li>`;
+      } finally {
+        suggestBtn.disabled = false;
+      }
+    };
+
+    refresh();
+  </script>
+</body>
+</html>

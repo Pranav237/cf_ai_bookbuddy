@@ -6,26 +6,8 @@ export class MyDurableObject {
     this.env = env;
   }
 
-  async fetch(request) {
-    const url = new URL(request.url);
-    const wishlist = (await this.state.storage.get("wishlist")) || [];
-
-    if (url.pathname.endsWith("/remove") && request.method === "POST") {
-      const body = await request.json();
-      const updated = wishlist.filter((b) => b !== body.title);
-      await this.state.storage.put("wishlist", updated);
-      return new Response(JSON.stringify({ ok: true, wishlist: updated }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    if (url.pathname.endsWith("/wishlist") && request.method === "GET") {
-      return new Response(JSON.stringify({ wishlist }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response("Not Found", { status: 404 });
+  async fetch() {
+    return new Response("Durable Object placeholder active", { status: 200 });
   }
 }
 
@@ -33,22 +15,78 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-  return env.ASSETS.fetch(request);
- 
-}
-
-
     if (url.pathname === "/suggest" && request.method === "POST") {
       try {
         const { prompt } = await request.json();
+        if (!prompt) {
+          return new Response("Missing prompt", { status: 400 });
+        }
+
         const ai = new Ai(env.AI);
+
         const result = await ai.run("@cf/meta/llama-3-8b-instruct", {
-          prompt: `Suggest 3 books based on this description: "${prompt}". Return only valid JSON — [{"title": "...", "reason": "..."}]`,
+          prompt: `
+Respond ONLY with strict JSON. 
+Do NOT include explanations or prose.
+Output format:
+[
+  {"title": "Book Title 1", "reason": "Reason text..."},
+  {"title": "Book Title 2", "reason": "Reason text..."},
+  {"title": "Book Title 3", "reason": "Reason text..."}
+]
+
+Now, suggest 3 books that match this description: "${prompt}".
+`
         });
-        let text = result?.response || result;
-        if (typeof text === "object") text = JSON.stringify(text, null, 2);
-        return new Response(text, {
+
+        let raw = result?.response || result;
+        let parsed = [];
+
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          const match = raw.match(/\[[\s\S]*\]/);
+          if (match) {
+            try {
+              parsed = JSON.parse(match[0]);
+            } catch {
+              parsed = [{ title: "Error", reason: "Could not parse extracted JSON." }];
+            }
+          } else {
+            parsed = [{ title: "Error", reason: raw }];
+          }
+        }
+
+        return new Response(JSON.stringify({ suggestions: parsed }), {
+          headers: { "Content-Type": "application/json" },
+        });
+
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/wishlist/add" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        if (!body.title) {
+          return new Response("Missing title", { status: 400 });
+        }
+
+        const note = body.note || "";
+        await env.BOOKBUDDY_KV.put(body.title, note);
+
+        const list = await env.BOOKBUDDY_KV.list();
+        const wishlist = [];
+        for (const k of list.keys) {
+          const n = await env.BOOKBUDDY_KV.get(k.name);
+          if (n !== null) wishlist.push({ title: k.name, note: n });
+        }
+
+        return new Response(JSON.stringify({ ok: true, wishlist }), {
           headers: { "Content-Type": "application/json" },
         });
       } catch (err) {
@@ -59,45 +97,54 @@ export default {
       }
     }
 
-    if (url.pathname === "/wishlist/remove") {
-      const id = env.MY_DURABLE_OBJECT.idFromName("global-wishlist");
-      const stub = env.MY_DURABLE_OBJECT.get(id);
-      return stub.fetch(request);
-    }
+    if (url.pathname === "/wishlist/remove" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        if (!body.title) {
+          return new Response("Missing title", { status: 400 });
+        }
 
-    if (url.pathname === "/wishlist/add" && request.method === "POST") {
-      const body = await request.json();
-      if (!body.title) return new Response("Missing title", { status: 400 });
-      const note = body.note || "";
-      await env.BOOKBUDDY_KV.put(body.title, note);
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+        await env.BOOKBUDDY_KV.delete(body.title);
 
-    if (url.pathname === "/wishlist" && request.method === "GET") {
-      const list = await env.BOOKBUDDY_KV.list();
-      const wishlist = await Promise.all(
-        list.keys.map(async (k) => ({
-          title: k.name,
-          note: await env.BOOKBUDDY_KV.get(k.name),
-        }))
-      );
-      return new Response(JSON.stringify({ wishlist }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+        const list = await env.BOOKBUDDY_KV.list();
+        const wishlist = [];
+        for (const k of list.keys) {
+          const n = await env.BOOKBUDDY_KV.get(k.name);
+          if (n !== null) wishlist.push({ title: k.name, note: n });
+        }
 
-    if (url.pathname === "/kv" && request.method === "POST") {
-      const body = await request.json();
-      if (body.action === "delete" && body.key) {
-        await env.BOOKBUDDY_KV.delete(body.key);
-        return new Response(JSON.stringify({ ok: true, deleted: body.key }), {
+        return new Response(
+          JSON.stringify({ ok: true, deleted: body.title, wishlist }),
+          { headers: { "Content-Type": "application/json" } }
+        );
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
           headers: { "Content-Type": "application/json" },
         });
       }
     }
 
+    if (url.pathname === "/wishlist" && request.method === "GET") {
+      try {
+        const list = await env.BOOKBUDDY_KV.list();
+        const wishlist = [];
+
+        for (const k of list.keys) {
+          const note = await env.BOOKBUDDY_KV.get(k.name);
+          if (note !== null) wishlist.push({ title: k.name, note });
+        }
+
+        return new Response(JSON.stringify({ wishlist }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
 
     return new Response("BookBuddy worker active!", { status: 200 });
   },
