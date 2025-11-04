@@ -1,3 +1,5 @@
+import { Ai } from "@cloudflare/ai";
+
 export class MyDurableObject {
   constructor(state, env) {
     this.state = state;
@@ -12,6 +14,60 @@ export class MyDurableObject {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/suggest" && request.method === "POST") {
+      try {
+        const { prompt } = await request.json();
+        if (!prompt) {
+          return new Response("Missing prompt", { status: 400 });
+        }
+
+        const ai = new Ai(env.AI);
+
+        const result = await ai.run("@cf/meta/llama-3-8b-instruct", {
+          prompt: `
+Respond ONLY with strict JSON. 
+Do NOT include explanations or prose.
+Output format:
+[
+  {"title": "Book Title 1", "reason": "Reason text..."},
+  {"title": "Book Title 2", "reason": "Reason text..."},
+  {"title": "Book Title 3", "reason": "Reason text..."}
+]
+
+Now, suggest 3 books that match this description: "${prompt}".
+`
+        });
+
+        let raw = result?.response || result;
+        let parsed = [];
+
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          const match = raw.match(/\[[\s\S]*\]/);
+          if (match) {
+            try {
+              parsed = JSON.parse(match[0]);
+            } catch {
+              parsed = [{ title: "Error", reason: "Could not parse extracted JSON." }];
+            }
+          } else {
+            parsed = [{ title: "Error", reason: raw }];
+          }
+        }
+
+        return new Response(JSON.stringify({ suggestions: parsed }), {
+          headers: { "Content-Type": "application/json" },
+        });
+
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
 
     if (url.pathname === "/wishlist/add" && request.method === "POST") {
       try {

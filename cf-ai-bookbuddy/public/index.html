@@ -14,15 +14,22 @@
       margin-inline: auto;
       color: #222;
     }
+
     h1 {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
     }
+
     .input-row {
       display: flex;
       gap: 0.5rem;
       margin-bottom: 1rem;
     }
+
     input {
       flex: 1;
       padding: 0.5rem;
@@ -30,6 +37,7 @@
       border: 1px solid #ccc;
       border-radius: 6px;
     }
+
     button {
       padding: 0.5rem 1rem;
       font-size: 1rem;
@@ -38,14 +46,18 @@
       cursor: pointer;
       background-color: #0078d7;
       color: white;
+      transition: background-color 0.2s ease;
     }
+
     button:hover {
       background-color: #005fa3;
     }
+
     ul {
       list-style: none;
       padding: 0;
     }
+
     li {
       display: flex;
       justify-content: space-between;
@@ -56,9 +68,11 @@
       background: #fff;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
+
     li span {
       flex: 1;
     }
+
     .remove {
       background-color: #e74c3c;
       color: white;
@@ -67,14 +81,34 @@
       border-radius: 4px;
       cursor: pointer;
     }
+
     .remove:hover {
       background-color: #c0392b;
+    }
+
+    h2 {
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .suggestion-card {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .suggestion-card b {
+      color: #0078d7;
+    }
+
+    .error {
+      color: red;
     }
   </style>
 </head>
 <body>
   <h1>BookBuddy</h1>
 
+  <h2>Wishlist</h2>
   <div class="input-row">
     <input id="title" placeholder="Book title" />
     <input id="note" placeholder="Add a note..." />
@@ -82,6 +116,14 @@
   </div>
 
   <ul id="wishlist"></ul>
+
+  <h2>AI Book Suggestions</h2>
+  <div class="input-row">
+    <input id="prompt" placeholder="Describe what kind of book you want..." />
+    <button id="suggest">Get Suggestions</button>
+  </div>
+
+  <ul id="suggestions"></ul>
 
   <script>
     const base = location.origin;
@@ -104,7 +146,6 @@
 
         data.wishlist.forEach(({ title, note }) => {
           const li = document.createElement("li");
-
           const span = document.createElement("span");
           span.textContent = `${title}${note ? " — " + note : ""}`;
 
@@ -127,7 +168,7 @@
         });
       } catch (err) {
         console.error("Failed to load wishlist:", err);
-        ul.innerHTML = `<li style="color:red">Error loading wishlist.</li>`;
+        ul.innerHTML = `<li class="error">Error loading wishlist.</li>`;
       }
     }
 
@@ -151,6 +192,45 @@
         alert("Add failed: " + err.message);
       } finally {
         addBtn.disabled = false;
+      }
+    };
+
+    const suggestBtn = document.getElementById("suggest");
+    const suggestionsUl = document.getElementById("suggestions");
+
+    suggestBtn.onclick = async () => {
+      const prompt = document.getElementById("prompt").value.trim();
+      if (!prompt) return alert("Enter a description first!");
+      suggestBtn.disabled = true;
+      suggestionsUl.innerHTML = "<li>Thinking...</li>";
+
+      try {
+        const res = await fetch(`${base}/suggest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        suggestionsUl.innerHTML = "";
+        if (!data.suggestions || data.suggestions.length === 0) {
+          suggestionsUl.innerHTML = "<li>No suggestions found.</li>";
+          return;
+        }
+
+        data.suggestions.forEach(({ title, reason }) => {
+          const li = document.createElement("li");
+          li.classList.add("suggestion-card");
+          li.innerHTML = `<span><b>${title}</b> — ${reason}</span>`;
+          suggestionsUl.appendChild(li);
+        });
+      } catch (err) {
+        console.error(err);
+        suggestionsUl.innerHTML = `<li class="error">Error fetching suggestions.</li>`;
+      } finally {
+        suggestBtn.disabled = false;
       }
     };
 
