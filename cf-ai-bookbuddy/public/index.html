@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookBuddy</title>
+</head>
+<body>
+  <h1>BookBuddy</h1>
+
+  <input id="title" placeholder="Book title" />
+  <input id="note" placeholder="Add a note..." />
+  <button id="add">Add Book</button>
+
+  <ul id="wishlist"></ul>
+
+  <script>
+    const base = location.origin;
+
+    async function refresh() {
+      const res = await fetch(`${base}/wishlist`);
+      const data = await res.json();
+      const ul = document.getElementById('wishlist');
+      ul.innerHTML = '';
+      data.wishlist.forEach(({ title, note }) => {
+        const li = document.createElement('li');
+        li.textContent = `${title} — ${note}`;
+        const del = document.createElement('button');
+        del.textContent = 'x';
+        del.onclick = async () => {
+          await fetch(`${base}/wishlist/remove`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title }),
+          });
+          refresh();
+        };
+        li.appendChild(del);
+        ul.appendChild(li);
+      });
+    }
+
+    document.getElementById('add').onclick = async () => {
+      const title = document.getElementById('title').value;
+      const note = document.getElementById('note').value;
+      if (!title) return alert('Enter a title');
+      const res = await fetch(`${base}/wishlist/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, note }),
+      });
+      if (!res.ok) alert('Add failed');
+      refresh();
+    };
+
+    refresh();
+  </script>
+</body>
+</html>

@@ -20,5 +20,10 @@
     { "new_sqlite_classes": ["MyDurableObject"], "tag": "v1" }
   ],
 
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  "assets": {
+    "directory": "cf-ai-bookbuddy/public",
+    "binding": "ASSETS"
+  }
 }
